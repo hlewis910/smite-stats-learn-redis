@@ -1,30 +1,53 @@
+/* eslint-disable handle-callback-err */
 const router = require('express').Router();
 const { GodPlayerStats, God, GodInfo } = require('../../db');
 const godStats = require('../util/godStats');
 const defaultStats = Object.keys(require('../util/defaultPlayerGodStats'));
 
+
 router.get('/', async (req, res, next) => {
     try {
-        let gods = await God.findAll().map(god => god.name);
-        res.send(gods);
-    } catch(err){
+        req.redisMemory.get('hariet', async function(err, reply){
+            if (reply) {
+                req.redisMemory.expire('hariet', 100)
+                res.send(reply)
+            } else {
+                let gods = await God.findAll().map(god => god.name);
+                req.redisMemory.set('hariet', JSON.stringify(gods))
+                res.send(gods);
+            }
+            })
+    } catch (err){
         next(err);
     }
 })
 
+
+
+// client.set("string key", "string val", redis.print);
+// client.hset("hash key", "hashtest 1", "some value", redis.print);
+
 router.get('/:godName', async (req, res, next) => {
     try {
-        let godInfo = await God.findOne({
-            where: {
-                name: req.params.godName
-            },
-            include: [{
-                model: GodInfo,
-                required: true
-            }]
-        });
-        res.send(godInfo);
-    } catch(err){
+        req.redisMemory('david', async function(err, reply) {
+            if (reply) {
+                 req.redisMemory.expire('david', 100)
+                res.json(reply)
+            } else {
+                let godInfo = await God.findOne({
+                    where: {
+                        name: req.params.godName
+                    },
+                    include: [{
+                        model: GodInfo,
+                        required: true
+                    }]
+                }, {});
+                req.redisMemory.set('david', JSON.stringify(godInfo))
+                res.send(godInfo);
+            }
+        })
+    } catch (err){
         next(err);
     }
 })
@@ -62,7 +85,7 @@ router.get('/:godName/stats/:statName', async (req, res, next) => {
     try {
         let stat = await godStats.getStats(req.params.godName, [req.params.statName], req.query);
         res.send(stat);
-    } catch(err){
+    } catch (err){
         next(err);
     }
 })
